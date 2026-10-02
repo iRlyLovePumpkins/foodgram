@@ -9,6 +9,8 @@ class RecipeIngredientInline(admin.TabularInline):
     extra = 1
     min_num = 1
 
+    autocomplete_fields = ['ingredient']
+
 
 @admin.register(Recipe)
 class RecipeAdmin(admin.ModelAdmin):
@@ -16,10 +18,12 @@ class RecipeAdmin(admin.ModelAdmin):
     list_display = ('name', 'author', 'favorite_count')
     list_filter = ('tags',)
     inlines = [RecipeIngredientInline]
+    filter_horizontal = ('tags',)
 
     @admin.display(description='В избранном (раз)')
     def favorite_count(self, obj):
         return obj.favorited_by.count()
+
 
 @admin.register(Tag)
 class TagAdmin(admin.ModelAdmin):
@@ -33,12 +37,6 @@ class IngredientAdmin(admin.ModelAdmin):
     list_display = ('name', 'measurement_unit')
     search_fields = ('name',)
     list_filter = ('measurement_unit',)
-
-
-@admin.register(RecipeIngredient)
-class RecipeIngredientAdmin(admin.ModelAdmin):
-    list_display = ('recipe', 'ingredient', 'amount')
-    search_fields = ('recipe__name', 'ingredient__name')
 
 
 @admin.register(CustomUser)

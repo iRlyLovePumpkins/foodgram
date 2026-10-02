@@ -2,12 +2,18 @@ from django.contrib.auth import get_user_model
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from djoser.serializers import SetPasswordSerializer
-from api.serializers import UserCreateSerializer, UserSerializer, SubscriptionSerializer
+from api.serializers import (
+    UserCreateSerializer,
+    UserSerializer,
+    SubscriptionSerializer
+)
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.db.models import Exists, OuterRef, Value, BooleanField, Count
 from rest_framework.response import Response
+from foodgram_backend.settings import ALLOWED_METHODS
 
 User = get_user_model()
+
 
 class UserViewSet(viewsets.ModelViewSet):
     """ViewSet для работы с пользователями"""
@@ -16,22 +22,27 @@ class UserViewSet(viewsets.ModelViewSet):
     lookup_field = 'id'
     permission_classes = (AllowAny, )
     filter_backends = (filters.SearchFilter,)
-    search_fields = ('username',)
-    http_method_names = ['get', 'post', 'delete', 'put']
+    search_fields = ('username', 'email')
+    ordering_fields = ('id', 'username')
+    http_method_names = ALLOWED_METHODS
 
     @action(
-        detail=False, 
+        detail=False,
         methods=['post'],
         permission_classes=[IsAuthenticated],
         url_path='set_password'
     )
     def set_password(self, request):
-        serializer = SetPasswordSerializer(data=request.data, context={'request': request})
+        serializer = SetPasswordSerializer(
+            data=request.data, context={'request': request}
+        )
         serializer.is_valid(raise_exception=True)
-        
-        self.request.user.set_password(serializer.validated_data['new_password'])
+
+        self.request.user.set_password(
+            serializer.validated_data['new_password']
+        )
         self.request.user.save()
-        
+
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(
@@ -40,20 +51,24 @@ class UserViewSet(viewsets.ModelViewSet):
         permission_classes=[IsAuthenticated],
     )
     def me(self, request):
-            user = request.user
-            annotated_user = self.get_queryset().filter(pk=user.pk).first() if user.is_authenticated else user
-            if request.method == 'GET':
-                serializer = self.get_serializer(annotated_user)
-                return Response(serializer.data)
+        user = request.user
+        annotated_user = self.get_queryset().filter(
+            pk=user.pk
+        ).first() if user.is_authenticated else user
+        if request.method == 'GET':
+            serializer = self.get_serializer(annotated_user)
+            return Response(serializer.data)
 
-            serializer = self.get_serializer(
-                user, data=request.data, partial=True
-            )
-            serializer.is_valid(raise_exception=True)
-            serializer.save()
-            updated_annotated_user = self.get_queryset().filter(pk=user.pk).first() if user.is_authenticated else user
-            serializer = self.get_serializer(updated_annotated_user)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+        serializer = self.get_serializer(
+            user, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        updated_annotated_user = self.get_queryset().filter(
+            pk=user.pk
+        ).first() if user.is_authenticated else user
+        serializer = self.get_serializer(updated_annotated_user)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(
         detail=False,
@@ -71,23 +86,32 @@ class UserViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            serializer = self.get_serializer(user, data=request.data, partial=True)
+            serializer = self.get_serializer(
+                user,
+                data=request.data,
+                partial=True
+            )
             serializer.is_valid(raise_exception=True)
             serializer.save()
-            return Response({'avatar': user.avatar.url if user.avatar else None}, status=status.HTTP_200_OK)
+            return Response(
+                {'avatar': user.avatar.url if user.avatar else None},
+                status=status.HTTP_200_OK
+            )
 
         if request.method == 'DELETE':
             user.avatar.delete(save=True)
             return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(
-            detail=False,
-            methods=['get'],
-            url_path='subscriptions'
+        detail=False,
+        methods=['get'],
+        url_path='subscriptions'
     )
     def subscriptions(self, request):
         user = request.user
-        authors = user.subscriptions.all().annotate(recipes_count=Count('recipes'))
+        authors = user.subscriptions.all().annotate(
+            recipes_count=Count('recipes')
+        )
         paginated_authors = self.paginate_queryset(authors)
         serializer = SubscriptionSerializer(
             paginated_authors,
@@ -97,15 +121,15 @@ class UserViewSet(viewsets.ModelViewSet):
         return self.get_paginated_response(serializer.data)
 
     @action(
-            detail=True,
-            methods=['post', 'delete'],
-            permission_classes=[IsAuthenticated],
-            url_path='subscribe'
+        detail=True,
+        methods=['post', 'delete'],
+        permission_classes=[IsAuthenticated],
+        url_path='subscribe'
     )
-    def subscribe(self, request, pk=None):
+    def subscribe(self, request, id=None):
         user = request.user
         author = self.get_object()
-        is_subscribed = user.subscriptions.filter(pk=author.pk).exists()
+        is_subscribed = author.subscribers.filter(pk=user.pk).exists()
 
         if request.method == 'POST':
             if author == user:
@@ -120,8 +144,14 @@ class UserViewSet(viewsets.ModelViewSet):
                 )
 
             user.subscriptions.add(author)
-            author = User.objects.annotate(recipes_count=Count('recipes')).get(pk=author.pk)
-            serializer = SubscriptionSerializer(author, context={'request': request})
+            author = User.objects.annotate(
+                recipes_count=Count('recipes')
+            ).get(pk=author.pk)
+
+            serializer = SubscriptionSerializer(
+                author,
+                context={'request': request}
+            )
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         if request.method == 'DELETE':
@@ -135,22 +165,21 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response(status=status.HTTP_204_NO_CONTENT)
 
     def get_queryset(self):
-            user = self.request.user
-            queryset = User.objects.all()
+        user = self.request.user
+        queryset = User.objects.all()
 
-            if user.is_authenticated:
-                return queryset.annotate(
-                    is_subscribed=Exists(
-                        user.subscriptions.filter(pk=OuterRef('pk'))
-                    )
-                )
-            
+        if user.is_authenticated:
             return queryset.annotate(
-                is_subscribed=Value(False, output_field=BooleanField())
+                is_subscribed=Exists(
+                    user.subscriptions.filter(pk=OuterRef('pk'))
+                )
             )
+
+        return queryset.annotate(
+            is_subscribed=Value(False, output_field=BooleanField())
+        )
 
     def get_serializer_class(self):
         if self.action == 'create':
             return UserCreateSerializer
         return UserSerializer
-

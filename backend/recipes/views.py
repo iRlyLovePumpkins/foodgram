@@ -1,7 +1,6 @@
 from django.http import HttpResponse
-from django.shortcuts import get_object_or_404, redirect
 from django.db.models import Exists, OuterRef, Value, BooleanField, Sum
-from rest_framework import status, viewsets
+from rest_framework import filters, status, viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from api.serializers import (
@@ -15,20 +14,24 @@ from .models import (
     Recipe,
     Ingredient,
 )
-from .utils import encode_pk, decode_pk
+from .utils import encode_pk
 from .permissions import IsAuthorOrReadOnly
 from .models import RecipeIngredient, ShoppingCart
+from django_filters.rest_framework import DjangoFilterBackend
+from foodgram_backend.settings import ALLOWED_METHODS
 
 
 class TagViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
+    filter_backends = (filters.SearchFilter,)
     pagination_class = None
 
 
 class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Ingredient.objects.all()
     serializer_class = IngredientSerializer
+    filter_backends = (filters.SearchFilter,)
     pagination_class = None
 
     def get_queryset(self):
@@ -44,7 +47,19 @@ class RecipeViewSet(viewsets.ModelViewSet):
         'tags', 'recipe_ingredient__ingredient'
     ).all()
     serializer_class = RecipeSerializer
-    permission_classes = [IsAuthorOrReadOnly]
+    filter_backends = (
+        DjangoFilterBackend,
+        filters.SearchFilter,
+        filters.OrderingFilter
+    )
+    filterset_fields = ('author', 'tags')
+    search_fields = ('name',)
+    ordering_fields = ('id', 'name')
+    permission_classes = [
+        IsAuthorOrReadOnly,
+        permissions.IsAuthenticatedOrReadOnly
+    ]
+    http_method_names = ALLOWED_METHODS
 
     @action(detail=True, methods=['get'], url_path='get-link')
     def get_link(self, request, pk=None):
@@ -54,10 +69,10 @@ class RecipeViewSet(viewsets.ModelViewSet):
         return Response({'short-link': short_url}, status=status.HTTP_200_OK)
 
     @action(
-            detail=False,
-            methods=['get'],
-            url_path='download_shopping_cart',
-        )
+        detail=False,
+        methods=['get'],
+        url_path='download_shopping_cart',
+    )
     def download_shopping_cart(self, request):
         user = request.user
         ingredients = (
@@ -76,14 +91,20 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
         file_content = ''.join(shopping_list)
 
-        response = HttpResponse(file_content, content_type='text/plain; charset=utf-8')
-        response['Content-Disposition'] = 'attachment; filename="shopping_list.txt"'
+        response = HttpResponse(
+            file_content,
+            content_type='text/plain; charset=utf-8'
+        )
+        response['Content-Disposition'] = (
+            'attachment; filename="shopping_list.txt"'
+        )
         return response
 
     @action(
-            detail=True,
-            methods=['post', 'delete'],
-            url_path='shopping_cart'
+        detail=True,
+        methods=['post', 'delete'],
+        url_path='shopping_cart',
+        permission_classes=[permissions.IsAuthenticated]
     )
     def shopping_cart(self, request, pk=None):
         recipe = self.get_object()
@@ -98,7 +119,10 @@ class RecipeViewSet(viewsets.ModelViewSet):
                 )
 
             ShoppingCart.objects.create(user=user, recipe=recipe)
-            serializer = RecipeShortSerializer(recipe, context={'request': request})
+            serializer = RecipeShortSerializer(
+                recipe,
+                context={'request': request}
+            )
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         if request.method == 'DELETE':
@@ -112,8 +136,9 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
     @action(
         detail=True,
+        permission_classes=[permissions.IsAuthenticated],
         methods=['post', 'delete'],
-        url_path='favorite'
+        url_path='favorite',
     )
     def favorite(self, request, pk=None):
         recipe = self.get_object()
@@ -128,7 +153,10 @@ class RecipeViewSet(viewsets.ModelViewSet):
                 )
 
             user.favorites.add(recipe)
-            serializer = RecipeShortSerializer(recipe, context={'request': request})
+            serializer = RecipeShortSerializer(
+                recipe,
+                context={'request': request}
+            )
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         if request.method == 'DELETE':
@@ -143,14 +171,16 @@ class RecipeViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
         user = self.request.user
-        
+
         if user.is_authenticated:
             queryset = queryset.annotate(
                 is_favorited=Exists(
                     user.favorites.filter(pk=OuterRef('pk'))
                 ),
                 is_in_shopping_cart=Exists(
-                    ShoppingCart.objects.filter(user=user, recipe=OuterRef('pk'))
+                    ShoppingCart.objects.filter(
+                        user=user, recipe=OuterRef('pk')
+                    )
                 )
             )
         else:
@@ -158,6 +188,21 @@ class RecipeViewSet(viewsets.ModelViewSet):
                 is_favorited=Value(False, output_field=BooleanField()),
                 is_in_shopping_cart=Value(False, output_field=BooleanField())
             )
+
+        cart_param = self.request.query_params.get('is_in_shopping_cart')
+        if cart_param is not None and user.is_authenticated:
+            is_true = str(cart_param).lower() in ['1', 'true']
+            queryset = queryset.filter(is_in_shopping_cart=is_true)
+        elif cart_param is not None and not user.is_authenticated:
+            return queryset.none()
+
+        favorited_param = self.request.query_params.get('is_favorited')
+        if favorited_param is not None and user.is_authenticated:
+            is_true = str(favorited_param).lower() in ['1', 'true']
+            queryset = queryset.filter(is_favorited=is_true)
+        elif favorited_param is not None and not user.is_authenticated:
+            return queryset.none()
+
         return queryset
 
     def perform_create(self, serializer):
