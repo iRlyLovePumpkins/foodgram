@@ -4,7 +4,6 @@ import pytest
 
 from tests.utils import invalid_data_for_user_patch_and_creation
 
-
 USERS_URL = '/api/users/'
 TOKEN_URL = '/api/auth/token/login/'
 

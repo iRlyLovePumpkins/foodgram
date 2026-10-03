@@ -1,25 +1,17 @@
+from api.serializers import (IngredientSerializer, RecipeSerializer,
+                             RecipeShortSerializer, TagSerializer)
+from django.db.models import BooleanField, Exists, OuterRef, Sum, Value
 from django.http import HttpResponse
-from django.db.models import Exists, OuterRef, Value, BooleanField, Sum
-from rest_framework import filters, status, viewsets, permissions
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from api.serializers import (
-    TagSerializer,
-    RecipeSerializer,
-    IngredientSerializer,
-    RecipeShortSerializer
-)
-from .models import (
-    Tag,
-    Recipe,
-    Ingredient,
-)
-from .utils import encode_pk
-from .permissions import IsAuthorOrReadOnly
-from .models import RecipeIngredient, ShoppingCart
 from django_filters.rest_framework import DjangoFilterBackend
 from foodgram_backend.settings import ALLOWED_METHODS
+from rest_framework import filters, permissions, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
+
 from .filters import RecipeFilter
+from .models import Ingredient, Recipe, RecipeIngredient, ShoppingCart, Tag
+from .permissions import IsAuthorOrReadOnly
+from .utils import encode_pk
 
 
 class TagViewSet(viewsets.ReadOnlyModelViewSet):

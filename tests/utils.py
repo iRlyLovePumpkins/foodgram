@@ -4,7 +4,6 @@ from io import BytesIO
 
 from PIL import Image
 
-
 invalid_data_for_username_and_email_fields = [
     (
         {

@@ -4,7 +4,6 @@ import pytest
 
 from tests.utils import check_pagination
 
-
 USERS_URL = '/api/users/'
 USERS_ME_URL = '/api/users/me/'
 

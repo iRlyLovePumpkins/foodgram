@@ -4,7 +4,6 @@ import pytest
 
 from tests.utils import create_tags
 
-
 TAGS_URL = '/api/tags/'
 
 

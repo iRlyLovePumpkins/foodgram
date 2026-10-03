@@ -1,16 +1,13 @@
+from api.serializers import (SubscriptionSerializer, UserCreateSerializer,
+                             UserSerializer)
 from django.contrib.auth import get_user_model
+from django.db.models import BooleanField, Count, Exists, OuterRef, Value
+from djoser.serializers import SetPasswordSerializer
+from foodgram_backend.settings import ALLOWED_METHODS
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
-from djoser.serializers import SetPasswordSerializer
-from api.serializers import (
-    UserCreateSerializer,
-    UserSerializer,
-    SubscriptionSerializer
-)
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from django.db.models import Exists, OuterRef, Value, BooleanField, Count
 from rest_framework.response import Response
-from foodgram_backend.settings import ALLOWED_METHODS
 
 User = get_user_model()
 

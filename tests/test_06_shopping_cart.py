@@ -4,7 +4,6 @@ import pytest
 
 from tests.utils import create_recipe, create_shopping_cart_item
 
-
 RECIPES_URL = '/api/recipes/'
 
 

@@ -4,7 +4,6 @@ import pytest
 
 from tests.utils import create_ingredients
 
-
 INGREDIENTS_URL = '/api/ingredients/'
 
 
