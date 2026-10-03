@@ -10,6 +10,7 @@ Django
 django-cors-headers
 django-filter
 djangorestframework
+djoser
 drf-extra-fields
 filetype
 flake8
