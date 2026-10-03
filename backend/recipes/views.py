@@ -19,6 +19,7 @@ from .permissions import IsAuthorOrReadOnly
 from .models import RecipeIngredient, ShoppingCart
 from django_filters.rest_framework import DjangoFilterBackend
 from foodgram_backend.settings import ALLOWED_METHODS
+from .filters import RecipeFilter
 
 
 class TagViewSet(viewsets.ReadOnlyModelViewSet):
@@ -52,7 +53,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
         filters.SearchFilter,
         filters.OrderingFilter
     )
-    filterset_fields = ('author', 'tags')
+    filterset_class = RecipeFilter
     search_fields = ('name',)
     ordering_fields = ('id', 'name')
     permission_classes = [
@@ -95,8 +96,9 @@ class RecipeViewSet(viewsets.ModelViewSet):
             file_content,
             content_type='text/plain; charset=utf-8'
         )
+        filename = f"{user.username}_shopping_list.txt"
         response['Content-Disposition'] = (
-            'attachment; filename="shopping_list.txt"'
+            f'attachment; filename="{filename}"'
         )
         return response
 

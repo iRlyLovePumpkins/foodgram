@@ -9,14 +9,9 @@
   {"name": "Супы", "slug": "soups"},
   {"name": "Напитки", "slug": "drinks"},
   {"name": "Вегетарианское", "slug": "vegetarian"},
-  {"name": "ПП (Правильное питание)", "slug": "healthy"},
-  {"name": "Быстро и просто", "slug": "quick_and_easy"},
-  {"name": "Праздничный стол", "slug": "holiday"},
   {"name": "Мясные блюда", "slug": "meat"},
   {"name": "Рыбные блюда", "slug": "fish"},
   {"name": "Гарниры", "slug": "side_dishes"},
   {"name": "Соусы", "slug": "sauces"},
   {"name": "Низкокалорийное", "slug": "low_calorie"},
-  {"name": "Детское меню", "slug": "kids"},
-  {"name": "На мангале / Гриль", "slug": "grill"}
 ]

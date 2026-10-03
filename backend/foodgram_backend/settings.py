@@ -92,6 +92,10 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+CSRF_TRUSTED_ORIGINS = [
+    'https://foodgram.myftp.org',
+    'http://foodgram.myftp.org',
+]
 
 # Internationalization
 # https://docs.djangoproject.com/en/6.1/topics/i18n/
@@ -135,7 +139,7 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticatedOrReadOnly',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
-    'PAGE_SIZE': 100
+    'PAGE_SIZE': 6
 }
 
 DJOSER = {
