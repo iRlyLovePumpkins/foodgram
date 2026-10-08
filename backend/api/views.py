@@ -1,25 +1,15 @@
-from api.serializers import (
-    IngredientSerializer,
-    RecipeSerializer,
-    RecipeShortSerializer,
-    SubscriptionSerializer,
-    TagSerializer,
-    UserCreateSerializer,
-    UserSerializer,
-)
+from api.serializers import (IngredientSerializer, RecipeSerializer,
+                             RecipeShortSerializer, SubscriptionSerializer,
+                             TagSerializer, UserCreateSerializer,
+                             UserSerializer)
 from django.contrib.auth import get_user_model
 from django.db.models import BooleanField, Count, Exists, OuterRef, Sum, Value
 from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
 from djoser.serializers import SetPasswordSerializer
 from foodgram_backend.settings import ALLOWED_METHODS
-from recipes.models import (
-    Ingredient,
-    Recipe,
-    RecipeIngredient,
-    ShoppingCart,
-    Tag
-)
+from recipes.models import (Ingredient, Recipe, RecipeIngredient, ShoppingCart,
+                            Tag)
 from rest_framework import filters, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
