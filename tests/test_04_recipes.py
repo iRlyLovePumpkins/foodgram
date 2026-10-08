@@ -2,9 +2,15 @@ from http import HTTPStatus
 
 import pytest
 
-from tests.utils import (check_pagination, create_ingredients, create_recipe,
-                         create_recipes, create_single_recipe, create_tags,
-                         recipe_payload)
+from tests.utils import (
+    check_pagination,
+    create_ingredients,
+    create_recipe,
+    create_recipes,
+    create_single_recipe,
+    create_tags,
+    recipe_payload,
+)
 
 RECIPES_URL = '/api/recipes/'
 

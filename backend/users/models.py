@@ -30,20 +30,6 @@ class CustomUser(AbstractUser):
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username', 'first_name', 'last_name']
 
-    def save(self, *args, **kwargs):
-        if self.username:
-            self.username = self.username.lower()
-
-        if self.pk:
-            try:
-                old = self.__class__.objects.get(pk=self.pk)
-                if old.avatar and old.avatar != self.avatar:
-                    old.avatar.delete(save=False)
-            except self.__class__.DoesNotExist:
-                pass
-
-        super().save(*args, **kwargs)
-
     class Meta:
         verbose_name = 'Пользователь'
         verbose_name_plural = 'Пользователи'

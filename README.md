@@ -33,5 +33,7 @@ Bash
 docker compose exec backend python manage.py migrate
 docker compose exec backend python manage.py collectstatic --no-input
 
+Tests: docker exec -it foodgram-backend-1 pytest ../tests
+
 Автор: Александра
 GitHub: iRlyLovePumpkins

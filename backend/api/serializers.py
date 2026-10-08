@@ -1,8 +1,15 @@
 from django.contrib.auth import authenticate, get_user_model
-from drf_extra_fields.fields import Base64ImageField
-from recipes.models import (Ingredient, Recipe, RecipeIngredient, ShoppingCart,
-                            Tag)
 from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
+
+from drf_extra_fields.fields import Base64ImageField
+from recipes.models import (
+    Ingredient,
+    Recipe,
+    RecipeIngredient,
+    ShoppingCart,
+    Tag,
+)
 
 User = get_user_model()
 
@@ -52,7 +59,10 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         )
 
     def get_is_subscribed(self, obj):
-        return True
+        request = self.context.get('request')
+        if not request or request.user.is_anonymous:
+            return False
+        return request.user.subscriptions.filter(pk=obj.pk).exists()
 
     def get_recipes(self, obj):
         request = self.context.get('request')
@@ -63,7 +73,10 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             try:
                 recipes = recipes[:int(limit)]
             except (ValueError, TypeError):
-                pass
+                raise ValidationError(
+                    {'recipes_limit':
+                     'Лимит должен быть целым положительным числом.'}
+                )
 
         serializer = RecipeShortSerializer(
             recipes,
@@ -75,7 +88,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
 
 class UserSerializer(serializers.ModelSerializer):
     is_subscribed = serializers.SerializerMethodField()
-    avatar = Base64ImageField(required=False, allow_null=True)
+    avatar = Base64ImageField(required=True, allow_null=True)
 
     class Meta:
         model = User
@@ -164,9 +177,18 @@ class RecipeSerializer(serializers.ModelSerializer):
             'cooking_time',
         )
 
+    def _save_ingredients(self, recipe, ingredients_data):
+        """
+        Вспомогательный метод для массового создания ингредиентов рецепта.
+        """
+        RecipeIngredient.objects.bulk_create([
+            RecipeIngredient(recipe=recipe, **item) for
+            item in ingredients_data
+        ])
+
     def validate(self, data):
         if self.instance:
-            if 'recipe_ingredient' not in data and 'ingredients' not in data:
+            if 'ingredients' not in data:
                 raise serializers.ValidationError(
                     {'ingredients':
                      'Нужен хотя бы один ингредиент для рецепта'}
@@ -227,33 +249,18 @@ class RecipeSerializer(serializers.ModelSerializer):
         recipe = Recipe.objects.create(**validated_data)
         recipe.tags.set(tags_data)
 
-        for ingredient_data in ingredients_data:
-            RecipeIngredient.objects.create(
-                recipe=recipe,
-                ingredient=ingredient_data.get('ingredient'),
-                amount=ingredient_data.get('amount')
-            )
+        self._save_ingredients(recipe, ingredients_data)
 
         return recipe
 
     def update(self, instance, validated_data):
         ingredients_data = validated_data.pop('recipe_ingredient', None)
-        tags_data = validated_data.pop('tags', None)
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.save()
-
-        if tags_data is not None:
-            instance.tags.set(tags_data)
+        instance = super().update(instance, validated_data)
 
         if ingredients_data is not None:
             instance.recipe_ingredient.all().delete()
-            for ingredient_data in ingredients_data:
-                RecipeIngredient.objects.create(
-                    recipe=instance,
-                    ingredient=ingredient_data.get('ingredient'),
-                    amount=ingredient_data.get('amount')
-                )
+            self._save_ingredients(instance, ingredients_data)
+
         return instance
 
 
@@ -279,20 +286,22 @@ class CustomCreateTokenSerializer(serializers.Serializer):
         email = attrs.get('email')
         password = attrs.get('password')
 
-        if email and password:
-            user = authenticate(
-                request=self.context.get('request'),
-                email=email,
-                password=password
-            )
-            if not user:
-                raise serializers.ValidationError(
-                    'Невозможно войти с предоставленными учетными данными.'
-                )
-        else:
+        if not email or not password:
             raise serializers.ValidationError(
                 'Укажите email и пароль'
             )
+
+        user = authenticate(
+            request=self.context.get('request'),
+            email=email,
+            password=password
+        )
+
+        if not user:
+            raise serializers.ValidationError(
+                'Невозможно войти с предоставленными учетными данными.'
+            )
+
         self.user = user
         attrs['user'] = user
         return attrs
