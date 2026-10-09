@@ -1,9 +1,16 @@
 from django.contrib.auth import authenticate, get_user_model
 from drf_extra_fields.fields import Base64ImageField
-from recipes.models import (Ingredient, Recipe, RecipeIngredient, ShoppingCart,
-                            Tag)
+from recipes.models import (
+    Ingredient,
+    Recipe,
+    RecipeIngredient,
+    ShoppingCart,
+    Tag,
+)
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
+
+from .mixins import SubscribedFieldMixin
 
 User = get_user_model()
 
@@ -38,7 +45,10 @@ class UserCreateSerializer(serializers.ModelSerializer):
         return User.objects.create_user(**validated_data)
 
 
-class SubscriptionSerializer(serializers.ModelSerializer):
+class SubscriptionSerializer(
+    SubscribedFieldMixin,
+    serializers.ModelSerializer
+):
     recipes = serializers.SerializerMethodField()
     recipes_count = serializers.IntegerField(read_only=True)
     is_subscribed = serializers.SerializerMethodField()
@@ -51,12 +61,6 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             'last_name', 'is_subscribed', 'recipes',
             'recipes_count', 'avatar'
         )
-
-    def get_is_subscribed(self, obj):
-        request = self.context.get('request')
-        if not request or request.user.is_anonymous:
-            return False
-        return request.user.subscriptions.filter(pk=obj.pk).exists()
 
     def get_recipes(self, obj):
         request = self.context.get('request')
@@ -80,7 +84,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         return serializer.data
 
 
-class UserSerializer(serializers.ModelSerializer):
+class UserSerializer(SubscribedFieldMixin, serializers.ModelSerializer):
     is_subscribed = serializers.SerializerMethodField()
     avatar = Base64ImageField(required=True, allow_null=True)
 
@@ -98,17 +102,6 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = (
             'id',
         )
-
-    def get_is_subscribed(self, obj):
-        annotated_value = getattr(obj, 'is_subscribed', None)
-        if annotated_value is not None:
-            return annotated_value
-
-        request = self.context.get('request')
-        if not request or request.user.is_anonymous:
-            return False
-
-        return request.user.subscriptions.filter(pk=obj.pk).exists()
 
 
 class TagSerializer(serializers.ModelSerializer):
@@ -181,16 +174,21 @@ class RecipeSerializer(serializers.ModelSerializer):
         ])
 
     def validate(self, data):
-        if self.instance:
-            if 'ingredients' not in data:
-                raise serializers.ValidationError(
-                    {'ingredients':
-                     'Нужен хотя бы один ингредиент для рецепта'}
-                )
-            if 'tags' not in data:
-                raise serializers.ValidationError(
-                    {'tags': 'Нужен хотя бы один тег для рецепта'}
-                )
+        ingredients = data.get('recipe_ingredient', data.get('ingredients'))
+        tags = data.get('tags')
+        if (
+            (not self.instance and not ingredients)
+            or ('recipe_ingredient' in data or 'ingredients' in data)
+            and not ingredients
+        ):
+            raise serializers.ValidationError(
+                {'ingredients': 'Нужен хотя бы один ингредиент для рецепта'}
+            )
+        if (not self.instance and not tags) or ('tags' in data and not tags):
+            raise serializers.ValidationError(
+                {'tags': 'Нужен хотя бы один тег для рецепта'}
+            )
+
         return data
 
     def validate_ingredients(self, value):
@@ -249,11 +247,11 @@ class RecipeSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         ingredients_data = validated_data.pop('recipe_ingredient', None)
+        tags_data = validated_data.pop('tags', [])
         instance = super().update(instance, validated_data)
-
-        if ingredients_data is not None:
-            instance.recipe_ingredient.all().delete()
-            self._save_ingredients(instance, ingredients_data)
+        instance.tags.set(tags_data)
+        instance.recipe_ingredient.all().delete()
+        self._save_ingredients(instance, ingredients_data)
 
         return instance
 

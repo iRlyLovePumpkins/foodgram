@@ -1,19 +1,30 @@
-from api.serializers import (IngredientSerializer, RecipeSerializer,
-                             RecipeShortSerializer, SubscriptionSerializer,
-                             TagSerializer, UserCreateSerializer,
-                             UserSerializer)
 from django.contrib.auth import get_user_model
 from django.db.models import BooleanField, Count, Exists, OuterRef, Sum, Value
 from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
 from djoser.serializers import SetPasswordSerializer
 from foodgram_backend.settings import ALLOWED_METHODS
-from recipes.models import (Ingredient, Recipe, RecipeIngredient, ShoppingCart,
-                            Tag)
 from rest_framework import filters, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+
+from api.serializers import (
+    IngredientSerializer,
+    RecipeSerializer,
+    RecipeShortSerializer,
+    SubscriptionSerializer,
+    TagSerializer,
+    UserCreateSerializer,
+    UserSerializer,
+)
+from recipes.models import (
+    Ingredient,
+    Recipe,
+    RecipeIngredient,
+    ShoppingCart,
+    Tag,
+)
 
 from .filters import RecipeFilter
 from .permissions import IsAuthorOrReadOnly
@@ -102,6 +113,19 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    def filter_by_param(self, qs, param_name):
+        """
+        Вспомогательный метод для фильтрации по параметрам
+        (is_favorited, is_in_shopping_cart).
+        """
+        param = self.request.query_params.get(param_name)
+        if param is not None:
+            if not self.request.user.is_authenticated:
+                return qs.none()
+            is_true = str(param).lower() in ('1', 'true')
+            return qs.filter(**{param_name: is_true})
+        return qs
+
     @action(detail=True, methods=['get'], url_path='get-link')
     def get_link(self, request, pk=None):
         recipe = self.get_object()
@@ -149,11 +173,14 @@ class RecipeViewSet(viewsets.ModelViewSet):
         permission_classes=[permissions.IsAuthenticated]
     )
     def shopping_cart(self, request, pk=None):
-        messages = {
-            'already_exists': 'Рецепт уже добавлен в список покупок.',
-            'not_found': 'Рецепт не найден в списке покупок.'
-        }
-        return self._handle_recipe_action(request, ShoppingCart, messages)
+        return self._handle_recipe_action(
+            request,
+            ShoppingCart,
+            {
+                'already_exists': 'Рецепт уже добавлен в список покупок.',
+                'not_found': 'Рецепт не найден в списке покупок.'
+            }
+        )
 
     @action(
         detail=True,
@@ -162,12 +189,13 @@ class RecipeViewSet(viewsets.ModelViewSet):
         url_path='favorite',
     )
     def favorite(self, request, pk=None):
-        messages = {
-            'already_exists': 'Рецепт уже есть в избранном.',
-            'not_found': 'Рецепт не найден в избранном.'
-        }
         return self._handle_recipe_action(
-            request, request.user.favorites, messages
+            request,
+            request.user.favorites,
+            {
+                'already_exists': 'Рецепт уже есть в избранном.',
+                'not_found': 'Рецепт не найден в избранном.'
+            }
         )
 
     def get_queryset(self):
@@ -191,17 +219,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
                 is_in_shopping_cart=Value(False, output_field=BooleanField())
             )
 
-        def filter_by_param(qs, param_name):
-            param = self.request.query_params.get(param_name)
-            if param is not None:
-                if not user.is_authenticated:
-                    return qs.none()
-                is_true = str(param).lower() in ('1', 'true')
-                return qs.filter(**{param_name: is_true})
-            return qs
-
-        queryset = filter_by_param(queryset, 'is_in_shopping_cart')
-        queryset = filter_by_param(queryset, 'is_favorited')
+        queryset = self.filter_by_param(queryset, 'is_in_shopping_cart')
+        queryset = self.filter_by_param(queryset, 'is_favorited')
 
         return queryset
 
@@ -244,9 +263,8 @@ class UserViewSet(viewsets.ModelViewSet):
     )
     def me(self, request):
         user = request.user
-        annotated_user = self.get_queryset().filter(pk=user.pk).first()
         if request.method == 'GET':
-            serializer = self.get_serializer(annotated_user)
+            serializer = self.get_serializer(user)
             return Response(serializer.data)
 
         serializer = self.get_serializer(
@@ -254,8 +272,6 @@ class UserViewSet(viewsets.ModelViewSet):
         )
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        updated_annotated_user = self.get_queryset().filter(pk=user.pk).first()
-        serializer = self.get_serializer(updated_annotated_user)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(
