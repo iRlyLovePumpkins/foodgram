@@ -3,7 +3,6 @@ from django.db.models import BooleanField, Count, Exists, OuterRef, Sum, Value
 from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
 from djoser.serializers import SetPasswordSerializer
-from foodgram_backend.settings import ALLOWED_METHODS
 from rest_framework import filters, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -18,6 +17,7 @@ from api.serializers import (
     UserCreateSerializer,
     UserSerializer,
 )
+from foodgram_backend.settings import ALLOWED_METHODS
 from recipes.models import (
     Ingredient,
     Recipe,
@@ -25,7 +25,6 @@ from recipes.models import (
     ShoppingCart,
     Tag,
 )
-
 from .filters import RecipeFilter
 from .permissions import IsAuthorOrReadOnly
 from .utils import encode_pk

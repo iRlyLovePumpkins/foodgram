@@ -10,7 +10,6 @@ from recipes.models import (
     ShoppingCart,
     Tag,
 )
-
 from .mixins import SubscribedFieldMixin
 
 User = get_user_model()
